@@ -1,0 +1,9 @@
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Release\TCFConverter.exe.config
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Release\TCFConverter.exe
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Release\TCFConverter.pdb
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Release\TCFConverter.Converter.resources
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Release\TCFConverter.Properties.Resources.resources
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Release\TCFConverter.csproj.GenerateResource.cache
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Release\TCFConverter.csproj.CoreCompileInputs.cache
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Release\TCFConverter.exe
+C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Release\TCFConverter.pdb
