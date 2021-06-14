@@ -15,30 +15,11 @@ namespace TCFConverter
         /// </summary>
         [STAThread]
         static void Main()
-        {           
-            System.Diagnostics.Process[] pcProcess = System.Diagnostics.Process.GetProcessesByName("EXCEL");
-            if (pcProcess.Length > 0)
-            {
-                foreach (Process p in pcProcess)
-                {
-                    p.Kill();
-                }                           
-            }
+        {          
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Converter());
-
-            System.Diagnostics.Process[] pcProcess2 = System.Diagnostics.Process.GetProcessesByName("EXCEL");
-            if (pcProcess2.Length > 0)
-            {
-                foreach (Process p2 in pcProcess2)
-                {
-                    p2.Kill();
-                }
-            }
-
-
         }
 
         

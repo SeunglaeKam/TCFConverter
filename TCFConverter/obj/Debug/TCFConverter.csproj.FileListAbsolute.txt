@@ -8,11 +8,3 @@ C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Debug\TCFConverter.
 C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Debug\TCFConverter.exe
 C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Debug\TCFConverter.pdb
 C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Debug\TCFConverter.csprojAssemblyReference.cache
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Spire.License.dll
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Spire.Pdf.dll
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Spire.XLS.dll
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Microsoft.mshtml.dll
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Spire.License.xml
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Spire.Pdf.xml
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\bin\Debug\Spire.XLS.xml
-C:\Users\pk893408\source\repos\TCFConverter\TCFConverter\obj\Debug\TCFConverter.csproj.CopyComplete
