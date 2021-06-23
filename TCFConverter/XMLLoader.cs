@@ -5,13 +5,14 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using System.ComponentModel;
+using System.Collections;
 
 namespace TCFConverter
-{
+{  
     public class XMLParmameter
-    {
-        private string project, product, revision, txusid, rxusid, prefix, txtriggermask, rxtriggermask;
-        private XmlNode txregister, rxregister, band, txdaq, rxlna;
+    {        
+        private string project, product, revision, txusid, rxusid, prefix, txtriggermask, rxtriggermask;        
+        private List<string> rxregister, txregister, band, txdaq, rxlna;
         public string Project
         {
             get { return project; }           
@@ -52,37 +53,40 @@ namespace TCFConverter
             get { return rxtriggermask; }
             set { rxtriggermask = value; }
         }
-        public XmlNode TxRegister
+        public List<string> TxRegister
         {
             get { return txregister; }
             set { txregister = value; }
         }
-        public XmlNode RxRegister
+        public List<string> RxRegister
         {
             get { return rxregister; }
             set { rxregister = value; }
         }
-        public XmlNode Band
+        public List<string> Band
         {
             get { return band; }
             set { band = value; }
         }
-        public XmlNode TxDAQ
+        public List<string> TxDAQ
         {
             get { return txdaq; }
             set { txdaq = value; }
         }
-        public XmlNode RxLNA
+        public List<string> RxLNA
         {
             get { return rxlna; }
             set { rxlna = value; }
         }
-
     }
-    class XMLLoader
-    {
+    public class XMLLoader : StringConverter
+    {      
+        internal static List<string> list = new List<string>();
+        internal static List<string> rxlist = new List<string>();
+        private string _Txreg = "";
+        private string _Rxreg = "";
 
-        [Category("Project")]
+        [Category("Project Name")]
         [DisplayNameAttribute("Project Name")]
         public string Name { get; set; }
 
@@ -90,7 +94,7 @@ namespace TCFConverter
         [DisplayNameAttribute("Project Product")]
         public string Product { get; set; }
 
-        [Category("Project")]
+        [Category("Revision")]
         [DisplayNameAttribute("Revision")]
         public string Revision { get; set; }
 
@@ -98,110 +102,172 @@ namespace TCFConverter
         [DisplayNameAttribute("TxUSID")]
         public string TxUSID { get; set; }
 
-        [Category("Project")]
+        [Category("RxUSID")]
         [DisplayNameAttribute("RxUSID")]
         public string RxUSID { get; set; }
 
-        [Category("Project")]
+        [Category("Prefix")]
         [DisplayNameAttribute("Prefix")]
         public string Prefix { get; set; }
 
-        [Category("Project")]
+        [Category("TxTriggerMask")]
         [DisplayNameAttribute("TxTriggerMask")]
         public string TriggerMask { get; set; }
 
-        [Category("Project")]
+        [Category("RxTriggerMask")]
         [DisplayNameAttribute("RxTriggerMask")]
         public string RxTriggerMask { get; set; }
 
-        [Category("Project")]
+        [Category("TxRegister")]        
         [DisplayNameAttribute("TxRegister")]
-        public string TxRegister { get; set; }
+        [TypeConverter(typeof(TxConverter))]
+        public string TxRegister
+        {
+            get
+            {
+                string txreg = "";
+                if (_Txreg != null)
+                {
+                    txreg = _Txreg;
+                }
+                else
+                {
+                    if (list.Count > 0)
+                    {
+                        txreg = list[0];
+                    }
+                }
+                return txreg;
+            }
+            set { _Txreg = value; }
+        } 
 
-        [Category("Project")]
+        [Category("RxRegister")]       
         [DisplayNameAttribute("RxRegister")]
-        public string RxRegister { get; set; }
-
-
+        [TypeConverter(typeof(RxConverter))]
+        public string RxRegister
+        {
+            get
+            {
+                string rxreg = "";
+                if (_Rxreg != null)
+                {
+                    rxreg = _Rxreg;
+                }
+                else
+                {
+                    if (rxlist.Count > 0)
+                    {
+                        rxreg = rxlist[0];
+                    }
+                }
+                return rxreg;
+            }
+            set { _Rxreg = value; }
+        }
         public XmlDocument LoadingXml(string path)
         {
-            XmlDocument configxml = new XmlDocument();
+            XmlDocument configxml = new XmlDocument();            
             configxml.Load(path);
             return configxml;
         }
-
-        public XMLParmameter ParsingXML(string path)
+        public XMLParmameter XmlDocumentParse(string path)
         {
-            XmlDocument configxml = new XmlDocument();           
-            configxml.Load(path);
+            XmlDocument configxml = new XmlDocument();
+            configxml.Load(path);            
+            
+            List<string> bandxmllist = new List<string>();
+            List<string> daqxmllist = new List<string>();
+            List<string> lnaxmllist = new List<string>();
+
+            XmlNodeList xmlList = configxml.SelectNodes("Configs");
             XMLParmameter xmlpara = new XMLParmameter();
-            foreach (XmlNode node in configxml.GetElementsByTagName("Project").Item(0))
+
+            foreach (XmlNode nodes in xmlList[0].ChildNodes)
             {
-                if (node.Name == "name")
+                if (nodes.Attributes[0].InnerText == "Project")
                 {
-                    Name = node.InnerText;
-                    xmlpara.Project = node.InnerText;
+                    xmlpara.Project = nodes.Attributes[1].InnerText;
+                    Name = nodes.Attributes[1].InnerText;
                 }
-                else if (node.Name == "product")
+                else if (nodes.Attributes[0].InnerText == "revision")
                 {
-                    Product = node.InnerText;
-                    xmlpara.Product = node.InnerText;
+                    xmlpara.Revision = nodes.Attributes[1].InnerText;
+                    Revision = nodes.Attributes[1].InnerText;
                 }
-                else if (node.Name == "revision")
+                else if (nodes.Attributes[0].InnerText == "TxUSID")
                 {
-                    Revision = node.InnerText;
-                    xmlpara.Revision = node.InnerText;
+                    xmlpara.TXUSID = nodes.Attributes[1].InnerText;
+                    TxUSID = nodes.Attributes[1].InnerText;
                 }
-                else if (node.Name == "TxUSID")
+                else if (nodes.Attributes[0].InnerText == "RxUSID")
                 {
-                    TxUSID = node.InnerText;
-                    xmlpara.TXUSID = node.InnerText;
+                    xmlpara.RXUSID = nodes.Attributes[1].InnerText;
+                    RxUSID = nodes.Attributes[1].InnerText;
                 }
-                else if (node.Name == "RxUSID")
+                else if (nodes.Attributes[0].InnerText == "Prefix")
                 {
-                    RxUSID = node.InnerText;
-                    xmlpara.RXUSID = node.InnerText;
+                    xmlpara.PreFix = nodes.Attributes[1].InnerText;
+                    Prefix = nodes.Attributes[1].InnerText;
                 }
-                else if (node.Name == "Prefix")
+                else if (nodes.Attributes[0].InnerText == "TxTriggerMask")
                 {
-                    Prefix = node.InnerText;
-                    xmlpara.PreFix = node.InnerText;
+                    xmlpara.TxTriggerMask = nodes.Attributes[1].InnerText;
+                    TriggerMask = nodes.Attributes[1].InnerText;
                 }
-                else if (node.Name == "TxTriggerMask")
+                else if (nodes.Attributes[0].InnerText == "RxTriggerMask")
                 {
-                    TriggerMask = node.InnerText;
-                    xmlpara.TxTriggerMask = node.InnerText;
+                    xmlpara.RxTriggerMask = nodes.Attributes[1].InnerText;
+                    RxTriggerMask = nodes.Attributes[1].InnerText;                    
                 }
-                else if (node.Name == "RxTriggerMask")
+                else if (nodes.Name == "TxRegister")
                 {
-                    RxTriggerMask = node.InnerText;
-                    xmlpara.RxTriggerMask = node.InnerText;
+                    list.Add(nodes.Attributes[0].InnerText + "_" + nodes.Attributes[1].InnerText + "," + nodes.Attributes[2].InnerText);
+                    xmlpara.TxRegister = list;
                 }
-                else if (node.Name == "TxRegister")
+                else if (nodes.Name == "RxRegister")
                 {
-                    TxRegister = node.InnerXml;
-                    xmlpara.TxRegister = node;
+                    rxlist.Add(nodes.Attributes[0].InnerText + "_" + nodes.Attributes[1].InnerText + "," + nodes.Attributes[2].InnerText);
+                    xmlpara.RxRegister = rxlist;
                 }
-                else if (node.Name == "RxRegister")
+                else if (nodes.Name == "BAND")
                 {
-                    RxRegister = node.InnerXml;
-                    xmlpara.RxRegister = node;
+                    bandxmllist.Add(nodes.Attributes[1].InnerText);
+                    xmlpara.Band = bandxmllist;
                 }
-                else if (node.Name == "Band")
-                {                    
-                    xmlpara.Band = node;
-                }
-                else if (node.Name == "TxDAQ")
+                else if (nodes.Name == "TxDAQ")
                 {
-                    xmlpara.TxDAQ = node;
+                    daqxmllist.Add(nodes.Attributes[0].InnerText + "," + nodes.Attributes[1].InnerText);
+                    xmlpara.TxDAQ = daqxmllist;
                 }
-                else if (node.Name == "RxLNA")
+                else if (nodes.Name == "RxLNA")
                 {
-                    xmlpara.RxLNA = node;
+                    lnaxmllist.Add(nodes.Attributes[0].InnerText + "," + nodes.Attributes[1].InnerText);
+                    xmlpara.RxLNA = lnaxmllist;
                 }
             }
             return xmlpara;
+        }       
+    }
+    public class TxConverter : StringConverter
+    {
+        XMLLoader xloader = new XMLLoader();
+        public override Boolean GetStandardValuesSupported(ITypeDescriptorContext context) { return true; }
+        public override Boolean GetStandardValuesExclusive(ITypeDescriptorContext context) { return false; }
+        public override TypeConverter.StandardValuesCollection GetStandardValues(ITypeDescriptorContext context)
+        {            
+            return new StandardValuesCollection(XMLLoader.list);
         }
-        
+    }
+    public class RxConverter : StringConverter
+    {
+        XMLLoader xloader = new XMLLoader();
+        public override Boolean GetStandardValuesSupported(ITypeDescriptorContext context) { return true; }
+        public override Boolean GetStandardValuesExclusive(ITypeDescriptorContext context) { return false; }
+        public override TypeConverter.StandardValuesCollection GetStandardValues(ITypeDescriptorContext context)
+        {
+
+            return new StandardValuesCollection(XMLLoader.rxlist);
+        }
     }
 }

@@ -26,35 +26,33 @@ namespace TCFConverter
     };
     public partial class Converter : Form
     {
+        #region Load Class Instance
         TCFManager ExcelLoader = new TCFManager();
         FileManager FolderCreator = new FileManager();
         RnDMerge RndMerge = new RnDMerge();
         XMLLoader XmlLoader = new XMLLoader();
-        XmlDocument ConfigXml;
-        XMLParmameter XmlParmeterMain = new XMLParmameter();
+        XMLParmameter XmlParmeterMain = new XMLParmameter();        
         MIPIParser MIPIParser = new MIPIParser();
-        XmlNodeList XmlList;
+        #endregion
+
+        string tcf_folder = "";
+        string cfg_folder = "";
+        Dictionary<string, int> CommonIndexDic;
         List<string> MainBandList = new List<string>();
-        
+        List<string> band;
+        uint processID;
+        Microsoft.Office.Interop.Excel.Application common_excel;
+        Struct_xlsx common_xlsx;        
+
         string rootfolderpath = @"\\cifs.kosinas01.sen.broadcom.net\WSD\NPI_Share\TCF\";
         string backslash = "\\";
         string merge = "Merge";
         string xmlfilename;
-        string TCFfilepath;
-
-        string mainproject;
-        string mainrevision;
-        string product;
-        XmlNode band;
-
-        uint processID;
-        Microsoft.Office.Interop.Excel.Application common_excel;
-        Struct_xlsx common_xlsx;
+        string TCFfilepath;            
 
         public Converter()
-        {
-            InitializeComponent();            
-            this.propertygrid.SelectedObject = XmlLoader;
+        {            
+            InitializeComponent();               
 
             btn_Load_RnD.Enabled = false;
             btn_Load_TCF.Enabled = false;
@@ -62,6 +60,9 @@ namespace TCFConverter
             btn_Convert.Enabled = false;
             btn_Insert_RnD.Enabled = false;
             btn_Copy_RnD.Enabled = false;
+            btn_TCF.Enabled = false;
+            btn_Config.Enabled = false;
+            btn_Split.Enabled = false;
 
             ExcelLoader.UpdateProgress += UpdateProgress;
             MIPIParser.UpdateProgress += UpdateProgress;
@@ -69,9 +70,10 @@ namespace TCFConverter
         }
 
         private void Converter_Load(object sender, EventArgs e)
-        {
+        {            
             band_ListView.View = View.Details;
         }
+               
 
         #region ListView Property
         private void band_ListView_DrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
@@ -131,7 +133,7 @@ namespace TCFConverter
         {
             List<string> MergeNameList = new List<string>();
 
-            string prjpath = rootfolderpath + mainproject + backslash + product + backslash + mainrevision + backslash; 
+            string prjpath = rootfolderpath + XmlParmeterMain.Project + backslash + XmlParmeterMain.Product + backslash + XmlParmeterMain.Revision + backslash; 
             string mergepath = prjpath + merge + backslash;
             
             foreach (ListViewItem item in band_ListView.CheckedItems)
@@ -140,21 +142,23 @@ namespace TCFConverter
             }
             if (XmlLoader != null)
             {                
-                if (MergeNameList.Count != 0)
+                if (MergeNameList.Count != 0 && TCFfilepath != "")
                 {
                     if (!FolderCreator.FolderCheck(mergepath))
                     {
                         Directory.CreateDirectory(mergepath);
                     }
-                    RndMerge.MergeRnDFile(prjpath, mergepath, MergeNameList, common_excel, common_xlsx, TCFfilepath);
+                    //Merge First
+                    Struct_xlsx merged_xlsx =  RndMerge.MergeRnDFile(prjpath, mergepath, MergeNameList, common_excel, common_xlsx, TCFfilepath);
                     MessageBox.Show("Success Merging RnD Format File.");
-                    MIPIParser.ParseMIPIcmd(XmlList.Item(0), XmlParmeterMain, TCFfilepath, common_xlsx);
+                    //MIPI Command Combination
+                    MIPIParser.NewParseMIPIcmd(XmlParmeterMain, TCFfilepath, merged_xlsx, CommonIndexDic);
                     MessageBox.Show("MIPI Cmd Generate Complete.");
                     UpdateProgress(0);                    
                 }
                 else
                 {
-                    MessageBox.Show("Choose Band.");
+                    MessageBox.Show("Choose Band or Load TCF File.");
                 }
             }
             else
@@ -166,9 +170,7 @@ namespace TCFConverter
 
         #region Load TCF File
         private void btn_Load_TCF_Click(object sender, EventArgs e)
-        {
-            Stopwatch SW1 = new Stopwatch();
-            SW1.Start();
+        {           
             if (XmlLoader != null)
             {                
                 OpenFileDialog ofd_TCF = new OpenFileDialog();
@@ -180,11 +182,14 @@ namespace TCFConverter
                
                 if (dr_TCF == DialogResult.OK)
                 {
-                    TCFfilepath = ofd_TCF.FileName;
-                    ExcelLoader.LoadExcel(MainBandList, mainproject, TCFfilepath, out bool isLoaded, out uint mainprocessID, out Microsoft.Office.Interop.Excel.Application loaded_excel, out Struct_xlsx loaded_xlsx);
+                    TCFfilepath = ofd_TCF.FileName;         
+                    string tcf_safefilename = ofd_TCF.SafeFileName;               
+                    tcf_folder = TCFfilepath.Replace(tcf_safefilename, "");
+                    ExcelLoader.LoadExcel(MainBandList, XmlParmeterMain.Project, TCFfilepath, out bool isLoaded, out uint mainprocessID, out Microsoft.Office.Interop.Excel.Application loaded_excel, out Struct_xlsx loaded_xlsx, out Dictionary<string, int> MainIndexDic);
                     processID = mainprocessID;
                     common_excel = loaded_excel;
                     common_xlsx = loaded_xlsx;
+                    CommonIndexDic = MainIndexDic;
                     //Load Excel         
                     if (!isLoaded)
                     {
@@ -193,8 +198,9 @@ namespace TCFConverter
                     else
                     {
                         MessageBox.Show("Success Loading TCF");
-                        textBox.Text = TCFfilepath;
-                        btn_Convert.Enabled = true;                   
+                        textBox_TCF.Text = TCFfilepath;
+                        btn_Convert.Enabled = true;
+                        btn_TCF.Enabled = true;
                     }          
                 }
                 else if (dr_TCF == DialogResult.Cancel)
@@ -206,8 +212,6 @@ namespace TCFConverter
             {
                 MessageBox.Show("Load XML Config File.");
             }
-            MessageBox.Show("Loading " +SW1.Elapsed.TotalMilliseconds);
-
         }
         #endregion
 
@@ -223,14 +227,15 @@ namespace TCFConverter
 
             if (SplitNameList.Count() != 0)
             {               
-                string path = rootfolderpath  + mainproject + backslash + product + backslash + mainrevision + backslash;
+                string path = rootfolderpath  + XmlParmeterMain.Project + backslash + XmlParmeterMain.Product + backslash + XmlParmeterMain.Revision + backslash;
+
                 for (int j = 0; j < SplitNameList.Count(); j++)
                 {
                     FolderCreator.CreateFolder(path + SplitNameList[j]);
                 }
-
-                ExcelLoader.SpiltTCF(path, SplitNameList, common_xlsx, common_excel);
+                ExcelLoader.SpiltTCF(path, SplitNameList, common_xlsx, common_excel, CommonIndexDic);
                 MessageBox.Show("Split Complete.");
+                textBox_Split.Text = path;
                 UpdateProgress(0);
             }
             else
@@ -248,14 +253,13 @@ namespace TCFConverter
             {
                 CopyNameList.Add(item.SubItems[1].Text);
             }
-
             if (XmlLoader != null)
             {
-                if (!FolderCreator.FolderCheck(rootfolderpath + mainproject + backslash + product + backslash + mainrevision + backslash + merge))
+                if (!FolderCreator.FolderCheck(rootfolderpath + XmlParmeterMain.Project + backslash + XmlParmeterMain.Product + backslash + XmlParmeterMain.Revision + backslash + merge))
                 {
-                    Directory.CreateDirectory(rootfolderpath + mainproject + backslash + product + backslash + mainrevision + backslash + merge);
+                    Directory.CreateDirectory(rootfolderpath + XmlParmeterMain.Project + backslash + XmlParmeterMain.Product + backslash + XmlParmeterMain.Revision + backslash + merge);
                 }
-                if(!FolderCreator.CopyFile(CopyNameList, rootfolderpath + mainproject + backslash + product + backslash + mainrevision + backslash))
+                if(!FolderCreator.CopyFile(CopyNameList, rootfolderpath + XmlParmeterMain.Project + backslash + XmlParmeterMain.Product + backslash + XmlParmeterMain.Revision + backslash))
                 {
                     MessageBox.Show("Copy Fail. Check File Name.");
                 }
@@ -275,36 +279,37 @@ namespace TCFConverter
         private void btn_Load_XML_Config_Click(object sender, EventArgs e)
         {
             OpenFileDialog ofd_xml = new OpenFileDialog();
+            ofd_xml.InitialDirectory = System.Windows.Forms.Application.StartupPath;
             ofd_xml.Title = "Config File Open";
             ofd_xml.FileName = "";
             ofd_xml.Filter = "Config File (*.xml) | *.xml; | All Files (*.*) | *.*";
-
+            
             DialogResult dr_xml = ofd_xml.ShowDialog();
-
+            
             if (dr_xml == DialogResult.OK)
             {
                 xmlfilename = ofd_xml.FileName;
 
-                XmlParmeterMain = XmlLoader.ParsingXML(xmlfilename);
-
-                mainproject = XmlParmeterMain.Project;
-                mainrevision = XmlParmeterMain.Revision;
-                product = XmlParmeterMain.Product;
-                band = XmlParmeterMain.Band;
-
-                ConfigXml = XmlLoader.LoadingXml(xmlfilename);
-                XmlList = ConfigXml.GetElementsByTagName("Project");
+                XmlParmeterMain = XmlLoader.XmlDocumentParse(xmlfilename);               
+                band = XmlParmeterMain.Band;           
+                this.propertygrid.SelectedObject = XmlLoader;                
                 MessageBox.Show("Success Loading Config File.");
-                if(band_ListView.Items.Count != 0)
+                string cfg_filename = ofd_xml.FileName;
+                string cfg_safefilename = ofd_xml.SafeFileName;
+                textBox_Config.Text = cfg_filename;
+                cfg_folder = cfg_filename.Replace(cfg_safefilename, "");
+                btn_Config.Enabled = true;
+                if (band_ListView.Items.Count != 0)
                 {
                     band_ListView.Items.Clear();
                 }
-                for (int i = 0; i < band.ChildNodes.Count; i++)
+                for (int i = 0; i < band.Count; i++)
                 {
                     ListViewItem lvi = new ListViewItem();
-                    lvi.SubItems.Add(band.ChildNodes.Item(i).Name);
+                    lvi.SubItems.Add(band[i]);
                     band_ListView.Items.Add(lvi);
-                    MainBandList.Add(band.ChildNodes.Item(i).Name);
+                    band_ListView.Items[i].Checked = true;
+                    MainBandList.Add(band[i]);
                 }                
                 band_ListView.EndUpdate();
                 
@@ -318,8 +323,6 @@ namespace TCFConverter
             {
                 MessageBox.Show("File Open Fail.");
             }            
-            
-            
         }
         #endregion
 
@@ -339,8 +342,7 @@ namespace TCFConverter
                 if (dr_xml == DialogResult.OK)
                 {
                     string fileFullName = ofd_MIPI.FileName;                 
-                    //XmlList = ConfigXml.GetElementsByTagName("Project");
-                    MIPIParser.ParseMIPIcmd(XmlList.Item(0), XmlParmeterMain, fileFullName, out uint mipiprocessID);
+                    MIPIParser.ParseMIPIcmd(XmlParmeterMain, fileFullName, out uint mipiprocessID);
                     MessageBox.Show("MIPI Cmd Generate Complete.");
                     UpdateProgress(0);
                     if (mipiprocessID != 0)
@@ -362,6 +364,7 @@ namespace TCFConverter
             }
         }
         #endregion
+
         #region Insert RnD File 
         private void btn_Insert_RnD_Click(object sender, EventArgs e)
         {
@@ -375,7 +378,7 @@ namespace TCFConverter
             }
             if (XmlLoader != null && TCFfilepath != null)
             {
-                ExcelLoader.InsertRnD(XmlParmeterMain, nameList_insert_index, nameList_insert, rootfolderpath, xmlfilename, common_xlsx, common_excel);
+                ExcelLoader.InsertRnD(TCFfilepath, XmlParmeterMain, nameList_insert_index, nameList_insert, rootfolderpath, xmlfilename, common_xlsx, common_excel, CommonIndexDic);
                 MessageBox.Show("Insert Complete.");
                 UpdateProgress(0);
             }
@@ -385,11 +388,11 @@ namespace TCFConverter
             }            
         }
         #endregion
+        
         private void Prop_Value_Changed(object s, PropertyValueChangedEventArgs e)
         {
-            GridItem griditem =  e.ChangedItem;
-            string gridlabel = griditem.Label;
-            switch (gridlabel)
+            GridItem griditem =  e.ChangedItem;           
+            switch (griditem.Label)
             {
                 case "Project Name":
                     XmlParmeterMain.Project = griditem.Value.ToString();
@@ -414,10 +417,9 @@ namespace TCFConverter
                     break;
                 case "RxTriggerMask":
                     XmlParmeterMain.RxTriggerMask = griditem.Value.ToString();
-                    break;                    
+                    break;               
             }            
         }
-
         private void Converter_FormClosed(object sender, FormClosedEventArgs e)
         {
             if (processID != 0)
@@ -428,5 +430,41 @@ namespace TCFConverter
                 excelProcess.Kill();
             }
         }
+
+        #region Go Folder Button
+        private void btn_TCF_Click(object sender, EventArgs e)
+        {
+            if (tcf_folder != "")
+            {
+                Process.Start(tcf_folder);
+            }
+            else
+            {
+                MessageBox.Show("TCF File Path is not loaded.");
+            }
+        }
+        private void btn_Config_Click(object sender, EventArgs e)
+        {
+            if (cfg_folder != "")
+            {
+                Process.Start(cfg_folder);
+            }    
+            else
+            {
+                MessageBox.Show("Config File Path is not loaded.");
+            }
+        }
+        private void btn_Split_Click_1(object sender, EventArgs e)
+        {
+            if (textBox_Split.Text != "")
+            {
+                Process.Start(textBox_Split.Text);
+            }
+            else
+            {
+                MessageBox.Show("TCF file is not splitted.");
+            }
+        }
+        #endregion
     }  
 }

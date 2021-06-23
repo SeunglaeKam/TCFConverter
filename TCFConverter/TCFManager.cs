@@ -8,15 +8,13 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
+using System.Data.OleDb;
 
 namespace TCFConverter
 {
     public class TCFManager
-    {
-        Struct_xlsx struct_xlsx = new Struct_xlsx();   //Load Excel File.
-        FileManager FolderCreator = new FileManager();
-
-        public static Dictionary<string, int> ColumnIndexDic = new Dictionary<string, int>();
+    {       
+        FileManager FolderCreator = new FileManager();        
         public static List<Tuple<string, int, int>> Tuple_List_All = new List<Tuple<string, int, int>>();
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -25,22 +23,20 @@ namespace TCFConverter
         public delegate void UpdateProgressDelegate(int ProgressPercentage);
         public event UpdateProgressDelegate UpdateProgress;
 
-        public void LoadExcel(List<string> BandList, string prj, string filepath, out bool isLoaded, out uint proid, out Microsoft.Office.Interop.Excel.Application ExcelApplication, out Struct_xlsx struct_xlsx)
+        public void LoadExcel(List<string> BandList, string prj, string filepath, out bool isLoaded, out uint proid, out Microsoft.Office.Interop.Excel.Application ExcelApplication, out Struct_xlsx struct_xlsx, out Dictionary<string, int> ColumnIndexDic)
         {
             ExcelApplication = new Microsoft.Office.Interop.Excel.Application();
-            GetWindowThreadProcessId(new IntPtr(ExcelApplication.Hwnd), out proid);            
-         
+            GetWindowThreadProcessId(new IntPtr(ExcelApplication.Hwnd), out proid);
+            ColumnIndexDic = new Dictionary<string, int>();
 
             if (filepath != "")
-            {                 
+            {
                 struct_xlsx.workbook = ExcelApplication.Workbooks.Open(filepath,0,true,5,"","",true, Microsoft.Office.Interop.Excel.XlPlatform.xlWindows, "\t", false, false, 0, true, 1, 0);
-
                 ExcelApplication.Visible = false;
                 ExcelApplication.DisplayAlerts = false;
                 ExcelApplication.ScreenUpdating = false;
                 ExcelApplication.EnableEvents = false;            
-                ExcelApplication.DisplayStatusBar = false;
-            
+                ExcelApplication.DisplayStatusBar = false;            
 
                 Worksheet worksheet_main = struct_xlsx.workbook.Worksheets.get_Item("Main");
                 Range prj_range = worksheet_main.Columns["A"].Find("Title", Missing.Value, XlFindLookIn.xlValues, Missing.Value, Missing.Value, XlSearchDirection.xlNext, false, false, Missing.Value);
@@ -48,21 +44,14 @@ namespace TCFConverter
                 int prj_row = prj_range.Row;
                 int prj_col = prj_range.Column;
                
-                if(Convert.ToString((worksheet_main.Cells[prj_row, prj_col + 1] as Range).Value2) == prj)
+                if (Convert.ToString((worksheet_main.Cells[prj_row, prj_col + 1] as Range).Value2) == prj)
                 {
                     // Load Condition_PA tab in TCF for RF1
                     struct_xlsx.worksheet = struct_xlsx.workbook.Worksheets.get_Item("Condition_PA");
                     struct_xlsx.range = struct_xlsx.worksheet.UsedRange;
 
-                    for(int i = 1; i <= struct_xlsx.worksheet.UsedRange.Columns.Count; i++)
-                    {
-                        if (Convert.ToString((struct_xlsx.worksheet.UsedRange.Cells[2, i] as Range).Value2) != null && !ColumnIndexDic.ContainsKey(Convert.ToString((struct_xlsx.worksheet.UsedRange.Cells[2, i] as Range).Value2)))
-                        {
-                            ColumnIndexDic.Add(Convert.ToString((struct_xlsx.worksheet.UsedRange.Cells[2, i] as Range).Value2), i);
-                        }                                               
-                    }
-
-                    Tuple_List_All = FindRange(struct_xlsx, BandList);
+                    ColumnIndexDic = MakeIndexDictionary(struct_xlsx);
+                    Tuple_List_All = FindRange(struct_xlsx, BandList, ColumnIndexDic);
 
                     //Unhide All Data                
                     struct_xlsx.worksheet.Activate();
@@ -98,15 +87,13 @@ namespace TCFConverter
                 struct_xlsx.range = null;
                 struct_xlsx.workbook = null;
                 struct_xlsx.worksheet = null;
-            }
-            
+            }            
         }
 
-
-        public void SpiltTCF(string rootfolderpath, List<string> SplitList, Struct_xlsx split_xlsx, Microsoft.Office.Interop.Excel.Application loadedexcel)
+        public void SpiltTCF(string rootfolderpath, List<string> SplitList, Struct_xlsx split_xlsx, Microsoft.Office.Interop.Excel.Application loadedexcel, Dictionary<string, int> ColumnIndexDic)
         {                                
             int count = 0;
-            List<Tuple<string, int, int>>  tuple_list = FindRange(split_xlsx, SplitList);
+            List<Tuple<string, int, int>>  tuple_list = FindRange(split_xlsx, SplitList, ColumnIndexDic);
             string extension = ".xlsx";           
             foreach (var x in tuple_list)
             {        
@@ -181,13 +168,10 @@ namespace TCFConverter
                 UpdateProgress(totalProgress);
                 System.Windows.Forms.Application.DoEvents();
 
-                new_workbook.Close();
-                
-            }
-            
+                new_workbook.Close();                
+            }            
         }
-
-        public bool InsertRnD(XMLParmameter xmltcfparam, List<int> nameList_insert_index, List<string> nameList_insert, string insertpath, string xmlpath, Struct_xlsx insert_xlsx, Microsoft.Office.Interop.Excel.Application loadedexcel)
+        public bool InsertRnD(string TCFfilepath, XMLParmameter xmltcfparam, List<int> nameList_insert_index, List<string> nameList_insert, string insertpath, string xmlpath, Struct_xlsx insert_xlsx, Microsoft.Office.Interop.Excel.Application loadedexcel, Dictionary<string, int> ColumnIndexDic)
         {
             Tuple<string, int, int> Tuple_Insert;
             List<string> allitem_str = new List<string>();            
@@ -195,14 +179,15 @@ namespace TCFConverter
             string project = xmltcfparam.Project;
             string rev = xmltcfparam.Revision;
             string product = xmltcfparam.Product;
-            XmlNode band =  xmltcfparam.Band;                  
+            List<string> band =  xmltcfparam.Band;                  
 
             for (int i = 0; i < nameList_insert.Count; i++)
             {
                 int version = FolderCreator.RecentRevisionFileCheck(nameList_insert[i], insertpath + project + "\\" + product + "\\" + rev + "\\" + nameList_insert[i]);
                 string finalfilename = insertpath + project + "\\" + product + "\\" + rev + "\\" + nameList_insert[i] + "\\" + nameList_insert[i] + "_rev" + version.ToString() + ".xlsx";
 
-                Tuple_Insert = FindRange(insert_xlsx, nameList_insert[i]);
+                ///Find for Inserting 
+                Tuple_Insert = FindRange(insert_xlsx, nameList_insert[i], ColumnIndexDic); 
 
                 Workbook insertworkbook = loadedexcel.Workbooks.Add();
                 insertworkbook = loadedexcel.Workbooks.Open(Filename: finalfilename);
@@ -210,12 +195,13 @@ namespace TCFConverter
                 Worksheet insertworksheet = insertworkbook.Worksheets.get_Item(nameList_insert[i]);
                 Range insert_range = insertworksheet.Range["3" + ":" + insertworksheet.UsedRange.Rows.Count];
 
+                /// 삽입하려는 Band가 Target 파일에 존재하지 않는 경우 
                 if (Tuple_Insert.Item2 == 0) 
                 {
                     if (nameList_insert_index[i] != 0)
                     {
-                        string preband = band.ChildNodes.Item(nameList_insert_index[i] - 1).Name;
-                        int lastrange = FindlastRange(insert_xlsx.worksheet, preband).Item2;   
+                        string preband = band[nameList_insert_index[i] - 1];
+                        int lastrange = FindlastRange(insert_xlsx.worksheet, preband, ColumnIndexDic).Item2;   
 
                         insert_range.Copy();
                         insert_xlsx.worksheet.Range[(lastrange + 2).ToString() + ":" + ((lastrange + 2) + insertworksheet.UsedRange.Rows.Count - 2).ToString()].Insert(Microsoft.Office.Interop.Excel.XlInsertShiftDirection.xlShiftDown);
@@ -230,9 +216,9 @@ namespace TCFConverter
                 {
                     if (nameList_insert_index[i] != 0)
                     {
-                        string preband = band.ChildNodes.Item(nameList_insert_index[i] - 1).Name;
+                        string preband = band[nameList_insert_index[i] - 1];
                         insert_xlsx.worksheet.Range[Tuple_Insert.Item2.ToString() + ":" + Tuple_Insert.Item3.ToString()].Delete();
-                        int lastrange = FindlastRange(insert_xlsx.worksheet, preband).Item2;      
+                        int lastrange = FindlastRange(insert_xlsx.worksheet, preband, ColumnIndexDic).Item2;      
 
                         insert_range.Copy();
                         insert_xlsx.worksheet.Range[(lastrange + 2).ToString() + ":" + ((lastrange + 2) + insertworksheet.UsedRange.Rows.Count - 2).ToString()].Insert(Microsoft.Office.Interop.Excel.XlInsertShiftDirection.xlShiftDown);
@@ -251,13 +237,15 @@ namespace TCFConverter
                 UpdateProgress(totalProgress);
                 System.Windows.Forms.Application.DoEvents();
 
-            }
-            insert_xlsx.workbook.Save();
+            } 
+            
+            string insertfinalpath = TCFfilepath.Substring(0, TCFfilepath.LastIndexOf('.'));
+            insert_xlsx.workbook.SaveAs(insertfinalpath + "_insert_completed" + ".xlsx");
             UpdateProgress(100);
             return true;
         }
 
-        public List<Tuple<string, int, int>> FindRange(Struct_xlsx find_xlsx, List<string> foldernameList)
+        public List<Tuple<string, int, int>> FindRange(Struct_xlsx find_xlsx, List<string> foldernameList, Dictionary<string, int> ColumnIndexDic)
         {
 
             //int index_extractfolder = FindColumn(find_xlsx.range, "Extract folder");
@@ -293,8 +281,8 @@ namespace TCFConverter
             }
             return range_Tuple;
         }
-
-        public Tuple<string, int, int> FindRange(Struct_xlsx insert_xlsx, string foldername)
+        //Overloading
+        public Tuple<string, int, int> FindRange(Struct_xlsx insert_xlsx, string foldername, Dictionary<string, int> ColumnIndexDic)
         {
             int index_extractfolder = ColumnIndexDic["Extract folder"];
        
@@ -321,32 +309,33 @@ namespace TCFConverter
            
             return range_Tuple;
         }
-
-
-        public Tuple<string,int> FindlastRange(Worksheet find_sheet, string bandname)
+        public Tuple<string,int> FindlastRange(Worksheet find_sheet, string bandname, Dictionary<string, int> ColumnIndexDic)
         {
             int index_extractfolder = ColumnIndexDic["Extract folder"];                    
 
             //Worksheet sheet_for_findrange = struct_xlsx.worksheet;
-            Range range_extract_folder = find_sheet.Range[find_sheet.UsedRange.Cells[1, index_extractfolder], find_sheet.UsedRange.Cells[struct_xlsx.range.Rows.Count, index_extractfolder]];
+            Range range_extract_folder = find_sheet.Range[find_sheet.UsedRange.Cells[1, index_extractfolder], find_sheet.UsedRange.Cells[find_sheet.UsedRange.Rows.Count, index_extractfolder]];
             Range findRange_last = range_extract_folder.Find(bandname, Missing.Value, XlFindLookIn.xlValues, XlLookAt.xlWhole, XlSearchOrder.xlByColumns, XlSearchDirection.xlPrevious, false, false, Missing.Value);
 
             Tuple<string, int> range = new Tuple<string, int>(bandname,findRange_last.Row);     
             
             return range;
-        }
-
-        public int FindRow(int targetcolumnn, Range targetrange, string targetStr)
+        }   
+        public Dictionary<string,int> MakeIndexDictionary(Struct_xlsx xlsx)
         {
-
-            for (int j = 1; j <= targetrange.Rows.Count; ++j)
+            object[,] obj = xlsx.range.get_Value();
+            Dictionary<string, int> Dic = new Dictionary<string, int>();
+            for (int i = 1; i <= xlsx.range.Columns.Count; i++)
             {
-                if (targetStr == Convert.ToString((targetrange.Cells[j, targetcolumnn] as Range).Value2))
+                if (obj[2, i] != null)
                 {
-                    return j;
+                    if (!Dic.ContainsKey(obj[2, i].ToString()))
+                    {
+                         Dic.Add(obj[2, i].ToString(), i);
+                    }
                 }
             }
-            return 0;
+            return Dic;
         }
     }
 }

@@ -84,7 +84,6 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RnDMerge.cs" />
-    <Compile Include="TCFLoader.cs" />
     <Compile Include="TCFManager.cs" />
     <Compile Include="XMLLoader.cs" />
     <EmbeddedResource Include="Converter.resx">

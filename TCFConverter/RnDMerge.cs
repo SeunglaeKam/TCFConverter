@@ -17,7 +17,7 @@ namespace TCFConverter
         public delegate void UpdateProgressDelegate(int ProgressPercentage);
         public event UpdateProgressDelegate UpdateProgress;       
 
-        public void MergeRnDFile(string prjpath, string mergepath, List<String> mergelist, Microsoft.Office.Interop.Excel.Application target_excel, Struct_xlsx target_xlsx, string TCFpath)
+        public Struct_xlsx MergeRnDFile(string prjpath, string mergepath, List<String> mergelist, Microsoft.Office.Interop.Excel.Application target_excel, Struct_xlsx target_xlsx, string TCFpath)
         {          
             Struct_xlsx struct_xlsx_merge = new Struct_xlsx();
             List<int> tmp_list = new List<int>();
@@ -66,9 +66,9 @@ namespace TCFConverter
             }
 
             //Filter added. 
-            int mergedcolumncnt = merged_worksheet.UsedRange.Columns.Count;
-            Microsoft.Office.Interop.Excel.Range hiddenrange = merged_worksheet.Range[merged_worksheet.Cells[2, 1], merged_worksheet.Cells[2, mergedcolumncnt]];
-            hiddenrange.AutoFilter(1, Type.Missing, XlAutoFilterOperator.xlAnd, Type.Missing, false);
+            //int mergedcolumncnt = merged_worksheet.UsedRange.Columns.Count;
+            //Microsoft.Office.Interop.Excel.Range hiddenrange = merged_worksheet.Range[merged_worksheet.Cells[2, 1], merged_worksheet.Cells[2, mergedcolumncnt]];
+            //hiddenrange.AutoFilter(1, Type.Missing, XlAutoFilterOperator.xlAnd, Type.Missing, false);
 
 
             //Freeze Rows
@@ -91,14 +91,14 @@ namespace TCFConverter
             int column =  merged_worksheet.UsedRange.Columns.Count;
             
 
-            Range targetRange = target_xlsx.worksheet.Range[target_xlsx.worksheet.Cells[1,1], target_xlsx.worksheet.Cells[row, column]];          
-
+            Range targetRange = target_xlsx.worksheet.Range[target_xlsx.worksheet.Cells[1,1], target_xlsx.worksheet.Cells[row, column]];         
             merged_worksheet.UsedRange.Copy();
-            targetRange.Insert(Microsoft.Office.Interop.Excel.XlInsertShiftDirection.xlShiftDown);              
 
+            targetRange.Insert(Microsoft.Office.Interop.Excel.XlInsertShiftDirection.xlShiftDown);            
             target_xlsx.workbook.Save();
 
-            UpdateProgress(100);                    
+            UpdateProgress(100);
+            return target_xlsx;
         }
 
         private static System.Data.DataTable GetDataSetFromExcelFile(string finalfilename, string band)
